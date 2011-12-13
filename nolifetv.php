@@ -1,7 +1,7 @@
 <?php
 
 /*
- * 1997-2011 Quadra Informatique
+ * 1997-2012 Quadra Informatique
  *
  * NOTICE OF LICENSE
  *
@@ -11,159 +11,170 @@
  * to ecommerce@quadra-informatique.fr so we can send you a copy immediately.
  *
  *  @author Quadra Informatique <ecommerce@quadra-informatique.fr>
- *  @copyright 1997-2011 Quadra Informatique
+ *  @copyright 1997-2012 Quadra Informatique
  *  @version Release: $Revision: 1.0 $
  *  @license http://www.opensource.org/licenses/OSL-3.0  Open Software License (OSL 3.0)
  */
-if (!defined('_PS_VERSION_'))
-    exit;
 
 class Nolifetv extends Module {
 
-    public function __construct() {
-        $this->name = 'nolifetv';
-        $this->tab = 'Quadra Informatique';
-        $this->version = 1.0;
-        $this->author = 'Quadra Informatique';
-        $this->need_instance = 0;
-        parent::__construct();
-        $this->displayName = $this->l('Nolife TV');
-        $this->description = $this->l('Retrouver les programmes de Nolife TV en un coup d\'oeil');
-    }
+	protected $_cachePath;
+	protected $_cacheCfg = array();
 
-    public function install() {
-        if (parent::install() == false OR !$this->registerHook('leftColumn'))
-            return false;
-        return true;
-    }
+	public function __construct() {
+		$this->name = 'nolifetv';
+		$this->tab = 'front_office_features';
+		$this->version = 1.0;
+		$this->author = 'Quadra Informatique';
+		parent::__construct();
+		$this->displayName = $this->l('Nolife TV');
+		$this->description = $this->l('View last Nolife TV Shows');
 
-    public function uninstall() {
-        if (!parent::uninstall())
-            Db::getInstance()->Execute('DELETE FROM `' . _DB_PREFIX_ . 'nolifetv`');
-        parent::uninstall();
-    }
+		$this->_cachePath = dirname(__FILE__) . DS . 'cache' . DS;
+	}
 
-    public function hookLeftColumn($params) {
-        global $smarty;
-        // on recupere le xml des programmes
-        $program = $this->getData();
+	public function install() {
+		return ( parent::install() AND
+		Configuration::updateValue('NOAIR_CACHE_UPDATE', 1) AND
+		$this->registerHook('leftColumn'));
+	}
 
-        // on cherche les infos des programmes en cours
-        $result = $this->getAttribute($program, "/NoAir/slot");
+	public function uninstall() {
+		return (parent::uninstall() AND
+		Configuration::deleteByName('NOAIR_CACHE_UPDATE'));
+	}
 
-        // on renseigne le template avec les valeurs du xml
-        //
-         $smarty->assign('result', $result);
+	public function hookLeftColumn($params) {
+		global $smarty;
+		$this->_updateNoAirCache();
+		$smarty->assign('noAirData', $this->_getNoAirData());
+		return $this->display(__FILE__, 'nolifetv.tpl');
+	}
 
-        return $this->display(__FILE__, 'nolifetv.tpl');
-    }
+	public function hookRightColumn($params) {
+		return $this->hookLeftColumn($params);
+	}
 
-    public function hookRightColumn($params) {
-        return $this->hookLeftColumn($params);
-    }
-     public function hookHeader($params) {
-        return $this->hookLeftColumn($params);
-    }
-     public function hookFooter($params) {
-        return $this->hookLeftColumn($params);
-    }
-    /**
-     * Recupere les données des programmes et met a jour le xml le cas echeant
-     *
-     * @return xml object
-     */
-    public function getData() {
-        $dom = new DomDocument();
-        // on va lire le repertoire cache
-        $dir = dir("modules/nolifetv/cache/");
-        $files_type = "current.xml";
+	public function hookHeader($params) {
+		return $this->hookLeftColumn($params);
+	}
 
-        // on va traiter chaque fichier du repertoire
-        while ($filename = $dir->read()) {
-            $dispo = FALSE;
-            if (($filename != '.') && ($filename != '..') && stristr($filename, $files_type)) {
-                // si on trouve un current.xml
-                $dispo = TRUE;
-            }
-        }
-        // si on trouve un fichier xml
-        if ($dispo) {
-            $dom->load('modules/nolifetv/cache/current.xml');
-            $currentxml = simplexml_import_dom($dom);
+	public function hookFooter($params) {
+		return $this->hookLeftColumn($params);
+	}
 
-            // on verifie si le xml est a jour
-            $result = $this->getAvailable($currentxml, "/NoAir/slot");
+	protected function _loadCacheConfig() {
+		if ($ret = file_exists($this->_cachePath . 'noair.cfg'))
+			$this->_cacheConfig = unserialize(file_get_contents($this->_cachePath . 'noair.cfg'));
+		return $ret;
+	}
 
-            if (!$result)
-                $dom->load('http://www.nolife-tv.com/noair/noair.xml');
-        } else {
-            $dom->load('http://www.nolife-tv.com/noair/noair.xml');
-        }
-        // on sauvegarde le xml et on renvoie son contenu
-        $racine = simplexml_import_dom($dom);
-        $racine->asXML('modules/nolifetv/cache/current.xml');
-        return $racine;
-    }
+	protected function _saveCacheConfig() {
+		if (!file_exists($this->_cachePath . 'noair.cfg'))
+			touch($this->_cachePath . 'noair.cfg');
+		if (!$file = fopen($this->_cachePath . 'noair.cfg', 'w') OR
+				fwrite($file, serialize($this->_cacheConfig)) === false OR
+				!fclose($file))
+			return false;
+		return true;
+	}
 
-    /**
-     * Retourne les infos du programme en cours et des deux suivants
-     *
-     * @return array
-     */
-    function getAttribute($xml, $xpath) {
-        $recherche = $xml->xpath($xpath);
-        $currentDate = date("Y/m/d H:i:s.");
-        $tab_pgm = array();
-        $i = 0;
-        foreach ($recherche as $elt) {
-            $find = date("Y/m/d H:i:s.", strtotime($elt['date']));
-            if ($find > $currentDate) {
-                // programmes a suivre
-                $i++;
-                if ($i < 3) {
-                    $tab_pgm[$i]['title'] = $elt['title'];
-                    if ($elt['screenshot']!="")
-                        $tab_pgm[$i]['img'] = $elt['screenshot'];
-                    else
-                        $tab_pgm[$i]['img'] = "modules/nolifetv/images/default.jpg";
-                    $format_date = date("\L\e d/m/Y \à H:i", strtotime($elt['date']));
-                    $tab_pgm[$i]['type'] = $elt['type'];
-                    $tab_pgm[$i]['begin'] = $format_date;
+	/**
+	 * Recupere les données des programmes et met a jour le xml le cas echeant
+	 *
+	 * @return xml object
+	 */
+	protected function _updateNoAirCache() {
 
-                }
-            } else {
-                // programme en cours
-                $tab_pgm[$i]['title'] = $elt['title'];
-                if ($elt['screenshot'] != "")
-                    $tab_pgm[$i]['img'] = $elt['screenshot'];
-                else
-                    $tab_pgm[$i]['img'] = "modules/nolifetv/images/default.jpg";
-                $format_date = date("\L\e d/m/Y \à H:i", strtotime($elt['date']));
-                $tab_pgm[$i]['type'] = $elt['type'];
-                $tab_pgm[$i]['begin'] = $format_date;
-            }
-        }
-        return $tab_pgm;
-    }
 
-    /**
-     * Verifie si le xml des programmes est a jour
-     *
-     * @return bool
-     */
-    function getAvailable($xml, $xpath) {
-        $recherche = $xml->xpath($xpath);
-        $currentDate = date("Y/m/d H:i:s.");
-        $isUpdate = false;
-        foreach ($recherche as $elt) {
-            $find = date("Y/m/d H:i:s.", strtotime($elt['date']));
-            if ($find > $currentDate) {
-                $isUpdate = true;
-            }
-        }
-        return $isUpdate;
-    }
+
+		if (!file_exists($this->_cachePath . 'noair.cfg') OR
+				(int) Configuration::getValue('NOAIR_CACHE_UPDATE') < (time() - 86400)) {
+
+			$noAirXml = simplexml_load_file('http://www.nolife-tv.com/noair/noair.xml');
+			$i = 0;
+			foreach ($noAirXml->xpath('slot') as $xmlSlot) {
+				foreach ($xmlSlot->attributes() as $key => $val) {
+					switch ($key) {
+						case 'dateUTC' :
+							$this->_cacheConfig[$i]['timestampUTC'] = strtotime((string) $val);
+						default:
+							$this->_cacheConfig[$i][$key] = (string) $val;
+					}
+				}
+				//	if (!$this->_downloadScreenshot($i))
+				//		$this->_cacheConfig[$indexNb]['screenshot'] = $this->_path . '..' . DS . 'none.jpg';
+
+				$i++;
+			}
+		}
+		//print_r($noAirXml);
+		print_r($this->_cacheConfig);
+
+		die();
+
+
+//return $racine;
+	}
+
+
+
+	/**
+	 * Retourne les infos du programme en cours et des deux suivants
+	 *
+	 * @return array
+	 */
+	function getAttribute($xml, $xpath) {
+		$recherche = $xml->xpath($xpath);
+		$currentDate = date("Y/m/d H:i:s.");
+		$tab_pgm = array();
+		$i = 0;
+		foreach ($recherche as $elt) {
+			$find = date("Y/m/d H:i:s.", strtotime($elt['date']));
+			if ($find > $currentDate) {
+// programmes a suivre
+				$i++;
+				if ($i < 3) {
+					$tab_pgm[$i]['title'] = $elt['title'];
+					if ($elt['screenshot'] != "")
+						$tab_pgm[$i]['img'] = $elt['screenshot'];
+					else
+						$tab_pgm[$i]['img'] = "modules/nolifetv/images/default.jpg";
+					$format_date = date("\L\e d/m/Y \à H:i", strtotime($elt['date']));
+					$tab_pgm[$i]['type'] = $elt['type'];
+					$tab_pgm[$i]['begin'] = $format_date;
+				}
+			} else {
+// programme en cours
+				$tab_pgm[$i]['title'] = $elt['title'];
+				if ($elt['screenshot'] != "")
+					$tab_pgm[$i]['img'] = $elt['screenshot'];
+				else
+					$tab_pgm[$i]['img'] = "modules/nolifetv/images/default.jpg";
+				$format_date = date("\L\e d/m/Y \à H:i", strtotime($elt['date']));
+				$tab_pgm[$i]['type'] = $elt['type'];
+				$tab_pgm[$i]['begin'] = $format_date;
+			}
+		}
+		return $tab_pgm;
+	}
+
+	/**
+	 * Verifie si le xml des programmes est a jour
+	 *
+	 * @return bool
+	 */
+	function getAvailable($xml, $xpath) {
+		$recherche = $xml->xpath($xpath);
+		$currentDate = date("Y/m/d H:i:s.");
+		$isUpdate = false;
+		foreach ($recherche as $elt) {
+			$find = date("Y/m/d H:i:s.", strtotime($elt['date']));
+			if ($find > $currentDate) {
+				$isUpdate = true;
+			}
+		}
+		return $isUpdate;
+	}
 
 }
-
-?>
