@@ -3,10 +3,10 @@
 	<name>nolifetv</name>
 	<displayName><![CDATA[Nolife TV]]></displayName>
 	<version><![CDATA[1]]></version>
-	<description><![CDATA[Retrouver les programmes de Nolife TV en un coup d&#039;oeil]]></description>
+	<description><![CDATA[View last Nolife TV Shows]]></description>
 	<author><![CDATA[Quadra Informatique]]></author>
-	<tab><![CDATA[Quadra Informatique]]></tab>
+	<tab><![CDATA[front_office_features]]></tab>
 	<is_configurable>0</is_configurable>
-	<need_instance>0</need_instance>
+	<need_instance>1</need_instance>
 	<limited_countries></limited_countries>
 </module>

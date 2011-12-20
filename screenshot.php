@@ -15,17 +15,19 @@
  *  @version Release: $Revision: 1.0 $
  *  @license http://www.opensource.org/licenses/OSL-3.0  Open Software License (OSL 3.0)
  */
+require_once('../../config/config.inc.php');
 
 function downloadScreenshot($indexNb, $cachePath) {
 
 	if (!file_exists($cachePath . 'noair.cfg'))
-		return false:
+		return false;
 	$cacheConfig = unserialize(file_get_contents($cachePath . 'noair.cfg'));
 	$urlFrom = $cacheConfig[$indexNb]['screenshot'] ? 'screenshot' : 'AdditionalScreenshot';
 	$srcFile = $cacheConfig[$indexNb][$urlFrom];
 	$destFile = $cachePath . $indexNb . '.jpg';
-	$destWidth = 200;
-	$destHeight = 100;
+
+	$destWidth = Configuration::get('NOAIR_SCREENSHOT_WIDTH');
+	$destHeight = Configuration::get('NOAIR_SCREENSHOT_HEIGHT');
 
 	// Delete previous image
 	if (file_exists($destFile))
@@ -64,8 +66,8 @@ $cachePath = dirname(__FILE__) . DS . 'cache' . DS;
 
 if (!file_exists($cachePath . (int) $_GET['id'] . '.jpg')) {
 	if (!downloadScreenshot((int) $_GET['id'], $cachePath)) {
-		echofile_get_contents($cachePath . '..' . DS . 'none.jpg');
-		die();
+		echo file_get_contents($cachePath . '..' . DS . 'none.jpg');
+		die(); # ARGGGGH
 	}
 }
 echo file_get_contents($cachePath . (int) $_GET['id'] . '.jpg');

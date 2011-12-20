@@ -1,47 +1,59 @@
-<!-- Block mymodule -->
+<!-- Block nolifetv -->
 <style type="text/css">
 
 .img_nolife{
-width:40%;
-height:50px;
-float:left;
-padding-top:5px;
+    width:40%;
+    height:50px;
+    float:left;
+    padding-top:5px;
 }
 .hour_nolife{
-width:100%;
+    width:100%;
 }
 .type_nolife{
-width:100%;
-float:left;
+    width:100%;
+}
+.visualClear{
+    clear:both;
 }
 .title_nolife{
-width:50%;
-text-align:center;
-float:left;
-padding-top:20px;
-font-style:italic;
-font-weight:bold;
+    width:58%;
+    text-align:left;
+    float:left;
+    font-style:italic;
+    font-weight:bold;
+    padding-left:5px;
+}
+.date_nolife{
+    width:58%;
+    text-align:left;
+    float:left;
+    font-style:italic;
+    font-weight:bold;
+    padding-left:5px;
 }
 .program_nolife{
-padding-top:5px;
-width:100%;
-min-height:100px;
+    padding-top:5px;
+    width:100%;
+    min-height:100px;
 }
 
 </style>
 <div id="mymodule_block_left" class="block">
-<h4>A voir sur nolife TV</h4>
+<h4>A voir sur nolife TV</h4> 
 <div class="block_content">
- {foreach from=$result key=pgm item=i}
+ {foreach from=$noAirData key=pgm item=i}
 <div class="program_nolife">
 
-    <span class="hour_nolife">{$i.begin} </span>
+    <div class="hour_nolife">{$i.begin} </div>
     <img class="img_nolife"src="{$i.img}"alt ="Nolife TV" />
-    <span class="title_nolife"> {$i.title}</span>
-    <span class="type_nolife">Genre : {$i.type}</span>
-
+    <div class="title_nolife">{$i.title}</div>
+    <div class="date_nolife">{$i.date|date_format:"%d %b %Y %H:%M"}</div>
+    <div class="visualClear"><!-- --></div>
+    <div class="type_nolife">Genre : {$i.type}</div>
+    <div class="description_nolife">Description : {$i.description}</div>
 </div>
-  {/foreach}
+  {/foreach} 
 </div>
 </div>
-<!-- /Block mymodule -->
+<!-- /Block nolifetv -->

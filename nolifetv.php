@@ -36,20 +36,27 @@ class Nolifetv extends Module {
 	public function install() {
 		return ( parent::install() AND
 		Configuration::updateValue('NOAIR_CACHE_UPDATE', 1) AND
+		Configuration::updateValue('NOAIR_SCREENSHOT_HEIGHT', 100) AND
+		Configuration::updateValue('NOAIR_SCREENSHOT_WIDTH', 200) AND
 		$this->registerHook('leftColumn'));
 	}
 
 	public function uninstall() {
 		return (parent::uninstall() AND
-		Configuration::deleteByName('NOAIR_CACHE_UPDATE'));
+		Configuration::deleteByName('NOAIR_CACHE_UPDATE') AND
+		Configuration::deleteByName('NOAIR_SCREENSHOT_HEIGHT') AND
+		Configuration::deleteByName('NOAIR_SCREENSHOT_WIDTH')
+        );
 	}
 
 	public function hookLeftColumn($params) {
 		global $smarty;
 		$this->_updateNoAirCache();
-		$smarty->assign('noAirData', $this->_getNoAirData());
+		$smarty->assign('noAirData', $this->getUpcoming());
 		return $this->display(__FILE__, 'nolifetv.tpl');
 	}
+
+    # Because it's the same function....
 
 	public function hookRightColumn($params) {
 		return $this->hookLeftColumn($params);
@@ -63,17 +70,17 @@ class Nolifetv extends Module {
 		return $this->hookLeftColumn($params);
 	}
 
-	protected function _loadCacheConfig() {
+	protected function _loadCacheNoAir() {
 		if ($ret = file_exists($this->_cachePath . 'noair.cfg'))
-			$this->_cacheConfig = unserialize(file_get_contents($this->_cachePath . 'noair.cfg'));
+			$this->_cacheNoAir = unserialize(file_get_contents($this->_cachePath . 'noair.cfg'));
 		return $ret;
 	}
 
-	protected function _saveCacheConfig() {
+	protected function _saveCacheNoAir() {
 		if (!file_exists($this->_cachePath . 'noair.cfg'))
 			touch($this->_cachePath . 'noair.cfg');
 		if (!$file = fopen($this->_cachePath . 'noair.cfg', 'w') OR
-				fwrite($file, serialize($this->_cacheConfig)) === false OR
+				fwrite($file, serialize($this->_cacheNoAir)) === false OR
 				!fclose($file))
 			return false;
 		return true;
@@ -82,14 +89,24 @@ class Nolifetv extends Module {
 	/**
 	 * Recupere les données des programmes et met a jour le xml le cas echeant
 	 *
-	 * @return xml object
+	 * @return nothing
 	 */
 	protected function _updateNoAirCache() {
-
-
-
 		if (!file_exists($this->_cachePath . 'noair.cfg') OR
-				(int) Configuration::getValue('NOAIR_CACHE_UPDATE') < (time() - 86400)) {
+				(int) Configuration::get('NOAIR_CACHE_UPDATE') < (time() - 86400)) {
+
+            # DELETES .jpg files
+
+            if ($handle = opendir($this->_cachePath)) {
+                while (false !== ($entry = readdir($handle))) {
+                    if ($entry != "." && $entry != ".." && strstr($entry, '.jpg')) {
+                        unlink($this->_cachePath . $entry);
+                    }
+                }
+                closedir($handle);
+            }
+
+            # UPDATES the noAir cache
 
 			$noAirXml = simplexml_load_file('http://www.nolife-tv.com/noair/noair.xml');
 			$i = 0;
@@ -97,84 +114,56 @@ class Nolifetv extends Module {
 				foreach ($xmlSlot->attributes() as $key => $val) {
 					switch ($key) {
 						case 'dateUTC' :
-							$this->_cacheConfig[$i]['timestampUTC'] = strtotime((string) $val);
+							$this->_cacheNoAir[$i]['timestampUTC'] = strtotime((string) $val);
+                        case 'screenshot': #generating cached screenshot url
+                            $this->_cacheNoAir[$i]['img'] = "modules/nolifetv/screenshot.php?id=".$i;
 						default:
-							$this->_cacheConfig[$i][$key] = (string) $val;
+							$this->_cacheNoAir[$i][$key] = (string) $val;
 					}
 				}
-				//	if (!$this->_downloadScreenshot($i))
-				//		$this->_cacheConfig[$indexNb]['screenshot'] = $this->_path . '..' . DS . 'none.jpg';
-
 				$i++;
 			}
+
+            # SAVES the cache into local file
+
+            $this->_saveCacheNoAir();
 		}
-		//print_r($noAirXml);
-		print_r($this->_cacheConfig);
-
-		die();
-
-
-//return $racine;
 	}
 
+    /**
+    * Returns the xml data stored in the cacheNoAir file
+    * Populates the cache if the cache is empty
+    *
+    * @return cacheNoAir (Serialized XML)
+    */
+    protected function _getNoAirData(){
+        if(empty($this->_cacheNoAir)){
+            $this->_loadCacheNoAir();
+        }
+        return $this->_cacheNoAir;
+    }
 
+    /**
+    * Returns the xml data stored in the cacheNoAir file
+    * Displays the current show and the $limit following shows
+    *
+    * $limit The x elements following the current show 
+    * @return sliced cacheNoAir (Serialized XML)
+    */
+    public function getUpcoming($limit = 3){
+        $nowUTC = time() - ((int) date('Z')); # OUR TIMESTAMPS ARE BASED ON THE UTC DATE, SO WE NEED TO WORK WITH UTC NOW
 
-	/**
-	 * Retourne les infos du programme en cours et des deux suivants
-	 *
-	 * @return array
-	 */
-	function getAttribute($xml, $xpath) {
-		$recherche = $xml->xpath($xpath);
-		$currentDate = date("Y/m/d H:i:s.");
-		$tab_pgm = array();
-		$i = 0;
-		foreach ($recherche as $elt) {
-			$find = date("Y/m/d H:i:s.", strtotime($elt['date']));
-			if ($find > $currentDate) {
-// programmes a suivre
-				$i++;
-				if ($i < 3) {
-					$tab_pgm[$i]['title'] = $elt['title'];
-					if ($elt['screenshot'] != "")
-						$tab_pgm[$i]['img'] = $elt['screenshot'];
-					else
-						$tab_pgm[$i]['img'] = "modules/nolifetv/images/default.jpg";
-					$format_date = date("\L\e d/m/Y \à H:i", strtotime($elt['date']));
-					$tab_pgm[$i]['type'] = $elt['type'];
-					$tab_pgm[$i]['begin'] = $format_date;
-				}
-			} else {
-// programme en cours
-				$tab_pgm[$i]['title'] = $elt['title'];
-				if ($elt['screenshot'] != "")
-					$tab_pgm[$i]['img'] = $elt['screenshot'];
-				else
-					$tab_pgm[$i]['img'] = "modules/nolifetv/images/default.jpg";
-				$format_date = date("\L\e d/m/Y \à H:i", strtotime($elt['date']));
-				$tab_pgm[$i]['type'] = $elt['type'];
-				$tab_pgm[$i]['begin'] = $format_date;
-			}
-		}
-		return $tab_pgm;
-	}
-
-	/**
-	 * Verifie si le xml des programmes est a jour
-	 *
-	 * @return bool
-	 */
-	function getAvailable($xml, $xpath) {
-		$recherche = $xml->xpath($xpath);
-		$currentDate = date("Y/m/d H:i:s.");
-		$isUpdate = false;
-		foreach ($recherche as $elt) {
-			$find = date("Y/m/d H:i:s.", strtotime($elt['date']));
-			if ($find > $currentDate) {
-				$isUpdate = true;
-			}
-		}
-		return $isUpdate;
-	}
-
+        $data = $this->_getNoAirData();
+        $currentId = null;
+        $i = 0;
+        foreach($data AS $elmt){
+            #echo '<br/>test '.$elmt['timestampUTC'];
+            if($elmt['timestampUTC'] > $nowUTC){
+                $currentId = $i > 0 ? $i-1 : $i;
+                break;
+            }
+            $i++;
+        }       
+        return array_slice($data, $currentId, $limit + 1);
+    }
 }
