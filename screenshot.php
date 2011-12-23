@@ -15,7 +15,9 @@
  *  @version Release: $Revision: 1.0 $
  *  @license http://www.opensource.org/licenses/OSL-3.0  Open Software License (OSL 3.0)
  */
-require_once('../../config/config.inc.php');
+
+
+error_reporting(0);
 
 function downloadScreenshot($indexNb, $cachePath) {
 
@@ -26,8 +28,10 @@ function downloadScreenshot($indexNb, $cachePath) {
 	$srcFile = $cacheConfig[$indexNb][$urlFrom];
 	$destFile = $cachePath . $indexNb . '.jpg';
 
-	$destWidth = Configuration::get('NOAIR_SCREENSHOT_WIDTH');
-	$destHeight = Configuration::get('NOAIR_SCREENSHOT_HEIGHT');
+	// Load config from Prestashop
+	require_once('../../config/config.inc.php');
+	$destWidth = (int)Configuration::get('NOAIR_SCREENSHOT_WIDTH');
+	$destHeight = (int)Configuration::get('NOAIR_SCREENSHOT_HEIGHT');
 
 	// Delete previous image
 	if (file_exists($destFile))
@@ -35,39 +39,54 @@ function downloadScreenshot($indexNb, $cachePath) {
 			return false;
 
 	// Download Image
-	if (!$srcFile OR
-			!$data = file_get_contents($srcFile) OR
-			!touch($destFile) OR
-			!$handle = fopen($destFile, 'r+') OR
-			!fwrite($handle, $data) OR
-			!fclose($handle))
-		return false;
+	if ($srcFile AND
+			$data = file_get_contents($srcFile) AND
+			touch($destFile) AND
+			$handle = fopen($destFile, 'r+') AND
+			fwrite($handle, $data) AND
+			fclose($handle)) {
 
-	// Resize Image
-	list($srcWidth, $srcHeight, $type, $attr) = getimagesize($destFile);
-	if ($srcWidth > $destWidth || $srcHeight > $destHeight) {
-		if (!$image = imagecreatefromjpeg($destFile))
-			if (!$image = imagecreatefrompng($destFile))
-				if (!$image = imagecreatefromgif($destFile))
-					return false;
-		unlink($destFile);
-		$resize = imagecreatetruecolor($destWidth, $destHeight);
-		imagecopyresampled($resize, $image, 0, 0, 0, 0, $destWidth, $destHeight, $srcWidth, $srcHeight);
-		if (!imagejpeg($resize, $destFile, 100))
-			return false;
+		// Resize Image
+		list($srcWidth, $srcHeight, $type, $attr) = getimagesize($destFile);
+		if ($srcWidth > $destWidth || $srcHeight > $destHeight) {
+			if (!$image = imagecreatefromjpeg($destFile))
+				if (!$image = imagecreatefrompng($destFile))
+					if (!$image = imagecreatefromgif($destFile))
+						return false;
+			unlink($destFile);
+			$resize = imagecreatetruecolor($destWidth, $destHeight);
+			imagecopyresampled($resize, $image, 0, 0, 0, 0, $destWidth, $destHeight, $srcWidth, $srcHeight);
+			if (!imagejpeg($resize, $destFile, 100))
+				return false;
+		}
+		return true;
+
+	// use default image
+	}else{
+		return copy ($cachePath . '..' . DIRECTORY_SEPARATOR . 'none.jpg',$destFile);
 	}
+
+
 
 	return true;
 }
 
-Header('Content-type: image/jpeg');
+function SilentDownloadScreenshot($indexNb, $cachePath) {
+	ob_start();
+	try {
+		$ret=downloadScreenshot($indexNb, $cachePath);
+	}catch (Exception $e) {
+		$ret=false;
+	}
+	ob_end_flush();
+	return $ret;
+}
 
-$cachePath = dirname(__FILE__) . DS . 'cache' . DS;
+$cachePath = dirname(__FILE__) . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR;
 
 if (!file_exists($cachePath . (int) $_GET['id'] . '.jpg')) {
-	if (!downloadScreenshot((int) $_GET['id'], $cachePath)) {
-		echo file_get_contents($cachePath . '..' . DS . 'none.jpg');
+	if (!downloadScreenshot((int) $_GET['id'], $cachePath))
 		die(); # ARGGGGH
-	}
 }
+Header('Content-type: image/jpeg');
 echo file_get_contents($cachePath . (int) $_GET['id'] . '.jpg');

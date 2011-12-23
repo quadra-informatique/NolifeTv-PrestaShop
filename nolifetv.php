@@ -19,7 +19,7 @@
 class Nolifetv extends Module {
 
 	protected $_cachePath;
-	protected $_cacheCfg = array();
+	protected $_cacheData = array();
 
 	public function __construct() {
 		$this->name = 'nolifetv';
@@ -36,8 +36,9 @@ class Nolifetv extends Module {
 	public function install() {
 		return ( parent::install() AND
 		Configuration::updateValue('NOAIR_CACHE_UPDATE', 1) AND
-		Configuration::updateValue('NOAIR_SCREENSHOT_HEIGHT', 100) AND
-		Configuration::updateValue('NOAIR_SCREENSHOT_WIDTH', 200) AND
+		Configuration::updateValue('NOAIR_SCREENSHOT_HEIGHT', 81) AND
+		Configuration::updateValue('NOAIR_SCREENSHOT_WIDTH', 144) AND
+		Configuration::updateValue('NOAIR_UPCOMING_NB_SHOW', 3) AND
 		$this->registerHook('leftColumn'));
 	}
 
@@ -45,18 +46,18 @@ class Nolifetv extends Module {
 		return (parent::uninstall() AND
 		Configuration::deleteByName('NOAIR_CACHE_UPDATE') AND
 		Configuration::deleteByName('NOAIR_SCREENSHOT_HEIGHT') AND
-		Configuration::deleteByName('NOAIR_SCREENSHOT_WIDTH')
-        );
+		Configuration::deleteByName('NOAIR_SCREENSHOT_WIDTH') AND
+		Configuration::deleteByName('NOAIR_UPCOMING_NB_SHOW')
+		);
 	}
 
 	public function hookLeftColumn($params) {
 		global $smarty;
-		$this->_updateNoAirCache();
 		$smarty->assign('noAirData', $this->getUpcoming());
 		return $this->display(__FILE__, 'nolifetv.tpl');
 	}
 
-    # Because it's the same function....
+	# Because it's the same function....
 
 	public function hookRightColumn($params) {
 		return $this->hookLeftColumn($params);
@@ -70,100 +71,155 @@ class Nolifetv extends Module {
 		return $this->hookLeftColumn($params);
 	}
 
-	protected function _loadCacheNoAir() {
-		if ($ret = file_exists($this->_cachePath . 'noair.cfg'))
-			$this->_cacheNoAir = unserialize(file_get_contents($this->_cachePath . 'noair.cfg'));
-		return $ret;
+	# Admin stuff
+
+	public function getContent() {
+
+		$html = '<h2>' . $this->displayName . '</h2>';
+
+		if (!empty($_POST)) {
+			$html .= $this->_postProcess() ?
+					'<div class="conf confirm"><img src="../img/admin/ok.gif" alt="' . $this->l('ok') . '" /> ' . $this->l('Settings updated') . '</div>' :
+					'<div class="alert error">' . $this->l('Settings not updated') . '</div>';
+		}
+		return $html . $this->_displayForm();
 	}
 
-	protected function _saveCacheNoAir() {
+	protected function _postProcess() {
+		return (
+		Configuration::updateValue('NOAIR_SCREENSHOT_HEIGHT', (int) Tools::getValue('screenshot_height')) AND
+		Configuration::updateValue('NOAIR_SCREENSHOT_WIDTH', (int) Tools::getValue('screenshot_width')) AND
+		Configuration::updateValue('NOAIR_UPCOMING_NB_SHOW', (int) Tools::getValue('upcoming_nb_show'))
+		);
+	}
+
+	protected function _displayForm() {
+		global $cookie;
+		return '
+        <form action="' . $_SERVER['REQUEST_URI'] . '" method="post">
+        <fieldset style="padding:5px 0 15px 5px" ><legend style="margin-left:8px;"><img src="' . $this->_path . 'logo.gif" alt="" title="" />' . $this->l('Settings') . '</legend>
+            <label>' . $this->l('Last Noair Cache Update') . '</label>
+            <div style="padding: 0.2em 0.5em 1em 210px;">
+		  ' . date('l d F Y H:i:s', (int) Configuration::get('NOAIR_CACHE_UPDATE')) . '
+            </div>
+            <label>' . $this->l('Screenshot Height') . '</label>
+            <div class="margin-form">
+		  <input type="text" name="screenshot_height" id="screenshot_height" maxlength="3" size="3" value="' . Tools::getValue('screenshot_height', Configuration::get('NOAIR_SCREENSHOT_HEIGHT')) . '" />
+            </div>
+            <label>' . $this->l('Screenshot Width') . '</label>
+            <div class="margin-form">
+		  <input type="text" name="screenshot_width" id="screenshot_width" maxlength="3" size="3" value="' . Tools::getValue('screenshot_width', Configuration::get('NOAIR_SCREENSHOT_WIDTH')) . '" />
+            </div>
+            <label>' . $this->l('Upcoming Nb Show') . '</label>
+            <div class="margin-form">
+		  <input type="text" name="upcoming_nb_show" id="upcoming_nb_show" maxlength="3" size="3" value="' . Tools::getValue('upcoming_nb_show', Configuration::get('NOAIR_UPCOMING_NB_SHOW')) . '" />
+            </div>
+            <center><input type="submit" name="submitBlockRss" value="' . $this->l('Save') . '" class="button" /></center>
+	</fieldset>
+	</form>';
+	}
+
+	# Cache Stuff
+
+	/**
+	 * Import Nolife NoAir Data to the local Cache
+	 *
+	 * @return bool
+	 */
+	protected function _loadNoAirCache() {
+		if (!file_exists($this->_cachePath . 'noair.cfg') OR
+				(int) Configuration::get('NOAIR_CACHE_UPDATE') < (time() - 3600)) {
+			return $this->_updateNoAirCache();
+		} else {
+			if ($ret = file_exists($this->_cachePath . 'noair.cfg'))
+				$this->_cacheData = unserialize(file_get_contents($this->_cachePath . 'noair.cfg'));
+			return $ret;
+		}
+	}
+
+	/**
+	 * Import Nolife NoAir Data to the local Cache
+	 *
+	 * @return bool
+	 */
+	protected function _saveNoAirCache() {
 		if (!file_exists($this->_cachePath . 'noair.cfg'))
 			touch($this->_cachePath . 'noair.cfg');
 		if (!$file = fopen($this->_cachePath . 'noair.cfg', 'w') OR
-				fwrite($file, serialize($this->_cacheNoAir)) === false OR
+				fwrite($file, serialize($this->_cacheData)) === false OR
 				!fclose($file))
 			return false;
+		Configuration::updateValue('NOAIR_CACHE_UPDATE', time());
 		return true;
 	}
 
 	/**
-	 * Recupere les données des programmes et met a jour le xml le cas echeant
+	 * Import Nolife NoAir Data to the local Cache
 	 *
-	 * @return nothing
+	 * @return bool
 	 */
 	protected function _updateNoAirCache() {
-		if (!file_exists($this->_cachePath . 'noair.cfg') OR
-				(int) Configuration::get('NOAIR_CACHE_UPDATE') < (time() - 86400)) {
 
-            # DELETES .jpg files
+		# DELETES .jpg files
 
-            if ($handle = opendir($this->_cachePath)) {
-                while (false !== ($entry = readdir($handle))) {
-                    if ($entry != "." && $entry != ".." && strstr($entry, '.jpg')) {
-                        unlink($this->_cachePath . $entry);
-                    }
-                }
-                closedir($handle);
-            }
-
-            # UPDATES the noAir cache
-
-			$noAirXml = simplexml_load_file('http://www.nolife-tv.com/noair/noair.xml');
-			$i = 0;
-			foreach ($noAirXml->xpath('slot') as $xmlSlot) {
-				foreach ($xmlSlot->attributes() as $key => $val) {
-					switch ($key) {
-						case 'dateUTC' :
-							$this->_cacheNoAir[$i]['timestampUTC'] = strtotime((string) $val);
-                        case 'screenshot': #generating cached screenshot url
-                            $this->_cacheNoAir[$i]['img'] = "modules/nolifetv/screenshot.php?id=".$i;
-						default:
-							$this->_cacheNoAir[$i][$key] = (string) $val;
-					}
+		if ($handle = opendir($this->_cachePath)) {
+			while (false !== ($entry = readdir($handle))) {
+				if ($entry != "." && $entry != ".." && strstr($entry, '.jpg')) {
+					unlink($this->_cachePath . $entry);
 				}
-				$i++;
 			}
-
-            # SAVES the cache into local file
-
-            $this->_saveCacheNoAir();
+			closedir($handle);
 		}
+
+		# UPDATES the noAir data cache file
+
+		$noAirXml = simplexml_load_file('http://www.nolife-tv.com/noair/noair.xml');
+		$i = 0;
+		foreach ($noAirXml->xpath('slot') as $xmlSlot) {
+			foreach ($xmlSlot->attributes() as $key => $val) {
+				switch ($key) {
+					case 'dateUTC' :
+						$this->_cacheData[$i]['timestampUTC'] = strtotime((string) $val);
+					default:
+						$this->_cacheData[$i][$key] = (string) $val;
+				}
+			}
+			$this->_cacheData[$i]['cacheId'] = $i;
+			$i++;
+		}
+
+		# SAVES the cache into local file
+		return $this->_saveNoAirCache();
 	}
 
-    /**
-    * Returns the xml data stored in the cacheNoAir file
-    * Populates the cache if the cache is empty
-    *
-    * @return cacheNoAir (Serialized XML)
-    */
-    protected function _getNoAirData(){
-        if(empty($this->_cacheNoAir)){
-            $this->_loadCacheNoAir();
-        }
-        return $this->_cacheNoAir;
-    }
+	/**
+	 * Returns the xml data stored in the cacheNoAir file
+	 * Displays the current show and the $limit following shows
+	 *
+	 * $limit The x elements following the current show
+	 * @return sliced cacheNoAir (Serialized XML)
+	 */
+	public function getUpcoming() {
 
-    /**
-    * Returns the xml data stored in the cacheNoAir file
-    * Displays the current show and the $limit following shows
-    *
-    * $limit The x elements following the current show 
-    * @return sliced cacheNoAir (Serialized XML)
-    */
-    public function getUpcoming($limit = 3){
-        $nowUTC = time() - ((int) date('Z')); # OUR TIMESTAMPS ARE BASED ON THE UTC DATE, SO WE NEED TO WORK WITH UTC NOW
+		$this->_loadNoAirCache();
 
-        $data = $this->_getNoAirData();
-        $currentId = null;
-        $i = 0;
-        foreach($data AS $elmt){
-            #echo '<br/>test '.$elmt['timestampUTC'];
-            if($elmt['timestampUTC'] > $nowUTC){
-                $currentId = $i > 0 ? $i-1 : $i;
-                break;
-            }
-            $i++;
-        }       
-        return array_slice($data, $currentId, $limit + 1);
-    }
+		$nowUTC = time() - ((int) date('Z')); # OUR TIMESTAMPS ARE BASED ON THE UTC DATE, SO WE NEED TO WORK WITH UTC NOW
+		$limit = (int) Configuration::get('NOAIR_UPCOMING_NB_SHOW');
+
+		$currentId = null;
+		$i = 0;
+		foreach ($this->_cacheData AS $program) {
+			#echo '<br/>test '.$elmt['timestampUTC'];
+			if ($program['timestampUTC'] > $nowUTC) {
+				$currentId = $i > 0 ? $i - 1 : $i;
+				break;
+			}
+			$i++;
+		}
+
+		// todo : check si plus assez de progs en cache
+
+		return array_slice($this->_cacheData, $currentId, $limit + 1);
+	}
+
 }
