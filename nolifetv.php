@@ -18,8 +18,10 @@
 
 class Nolifetv extends Module {
 
-	protected $_cachePath;
+	protected $_cachePath = '';
 	protected $_cacheData = array();
+	protected $_cacheCurrentProgramId = null;
+	protected $_cacheAvailableUpcoming = null;
 
 	public function __construct() {
 		$this->name = 'nolifetv';
@@ -53,7 +55,9 @@ class Nolifetv extends Module {
 
 	public function hookLeftColumn($params) {
 		global $smarty;
-		$smarty->assign('noAirData', $this->getUpcoming());
+		if (!$programs = $this->getUpcoming())
+			return;
+		$smarty->assign('noAirData', $programs);
 		return $this->display(__FILE__, 'nolifetv.tpl');
 	}
 
@@ -132,8 +136,10 @@ class Nolifetv extends Module {
 	 */
 	protected function _loadNoAirCache() {
 
-		if ($ret = file_exists($this->_cachePath . 'noair.cfg'))
+		if ($ret = file_exists($this->_cachePath . 'noair.cfg')) {
 			$this->_cacheData = unserialize(file_get_contents($this->_cachePath . 'noair.cfg'));
+			$this->_setUpcomingCounters();
+		}
 		return $ret;
 	}
 
@@ -191,6 +197,7 @@ class Nolifetv extends Module {
 		}
 
 		// SAVES the cache into local file
+		$this->_setUpcomingCounters();
 		return $this->_saveNoAirCache();
 	}
 
@@ -203,42 +210,46 @@ class Nolifetv extends Module {
 	 *
 	 * @return arrau
 	 */
-	public function _getUpcomingCounters() {
+	public function _setUpcomingCounters() {
 
-		$ret = array('positionStart' => null, 'nbAvailable' => null);
-		$nowUTC = time() - ((int) date('Z')); // OUR TIMESTAMPS ARE BASED ON THE UTC DATE, SO WE NEED TO WORK WITH UTC NOW
+		// reset counters
+		$this->_cacheCurrentProgramId = null;
+		$this->_cacheAvailableUpcoming = null;
+
+		// OUR TIMESTAMPS ARE BASED ON THE UTC DATE, SO WE NEED TO WORK WITH UTC NOW
+		$nowUTC = time() - ((int) date('Z'));
+
 		// get first program position
 		foreach ($this->_cacheData as $program) {
 			if ($program['timestampUTC'] > $nowUTC) {
-				$ret['positionStart'] = $program['cacheId'] > 0 ? $program['cacheId'] - 1 : $program['cacheId'];
+				$this->_cacheCurrentProgramId = $program['cacheId'] > 0 ? $program['cacheId'] - 1 : $program['cacheId'];
 				break;
 			}
 		}
+		if (!$this->_cacheCurrentProgramId)
+			return;
+
 		// get nb programs available after
 		foreach ($this->_cacheData as $program)
-			if ($program['cacheId'] >= $ret['positionStart'])
-				$ret['nbAvailable']++;
-		return $ret;
+			if ($program['cacheId'] >= $this->_cacheCurrentProgramId)
+				$this->_cacheAvailableUpcoming++;
 	}
 
 	/**
 	 * Load and check the Noair Cache.
 	 * returns a ready to use array for a smarty template file
+	 * return false is no progam are available, even after cache refresh
 	 *
-	 * @return array
+	 * @return array / bool
 	 */
 	public function getUpcoming() {
 
-		if (!$this->_loadNoAirCache())
-			$this->_updateNoAirCache();
-
-		$counters = $this->_getUpcomingCounters();
 		$nbToShow = 1 + (int) Configuration::get('NOAIR_UPCOMING_NB_SHOW');
 
-		if ($counters['nbAvailable'] < $nbToShow)
+		if (!$this->_loadNoAirCache() OR ($this->_cacheAvailableUpcoming < $nbToShow))
 			$this->_updateNoAirCache();
 
-		return array_slice($this->_cacheData, $counters['positionStart'], $nbToShow);
+		return $this->_cacheCurrentProgramId ? array_slice($this->_cacheData, $this->_cacheCurrentProgramId, $nbToShow) : false;
 	}
 
 }

@@ -3,7 +3,7 @@
 global $_MODULE;
 $_MODULE = array();
 $_MODULE['<{nolifetv}prestashop>nolifetv_559833bf708648fc7572731e23655ecb'] = 'Nolife TV : NoAir Webservice';
-$_MODULE['<{nolifetv}prestashop>nolifetv_9d04ffa3064e53f67d2467558e115b1f'] = 'En ce moment sur Nolife';
+$_MODULE['<{nolifetv}prestashop>nolifetv_9d04ffa3064e53f67d2467558e115b1f'] = 'A voir sur Nolife';
 $_MODULE['<{nolifetv}prestashop>nolifetv_c888438d14855d7d96a2724ee9c306bd'] = 'Paramètres mis à jour';
 $_MODULE['<{nolifetv}prestashop>nolifetv_6339057c04eafb3954cf17cd06847efc'] = 'Paramètres non sauvegardés';
 $_MODULE['<{nolifetv}prestashop>nolifetv_f4f70727dc34561dfde1a3c529b6205c'] = 'Paramètres';
