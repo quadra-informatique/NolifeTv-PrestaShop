@@ -27,8 +27,8 @@ class Nolifetv extends Module {
 		$this->version = 1.0;
 		$this->author = 'Quadra Informatique';
 		parent::__construct();
-		$this->displayName = $this->l('Nolife TV');
-		$this->description = $this->l('View last Nolife TV Shows');
+		$this->displayName = $this->l('Nolife TV : NoAir Webservice');
+		$this->description = $this->l('Now on Nolife');
 
 		$this->_cachePath = dirname(__FILE__) . DS . 'cache' . DS;
 	}
@@ -57,7 +57,7 @@ class Nolifetv extends Module {
 		return $this->display(__FILE__, 'nolifetv.tpl');
 	}
 
-	# Because it's the same function....
+	// Because it's the same function....
 
 	public function hookRightColumn($params) {
 		return $this->hookLeftColumn($params);
@@ -71,7 +71,7 @@ class Nolifetv extends Module {
 		return $this->hookLeftColumn($params);
 	}
 
-	# Admin stuff
+	// Admin stuff
 
 	public function getContent() {
 
@@ -79,7 +79,7 @@ class Nolifetv extends Module {
 
 		if (!empty($_POST)) {
 			$html .= $this->_postProcess() ?
-					'<div class="conf confirm"><img src="../img/admin/ok.gif" alt="' . $this->l('ok') . '" /> ' . $this->l('Settings updated') . '</div>' :
+					'<div class="conf confirm"><img src="../img/admin/ok.gif" alt="ok" /> ' . $this->l('Settings updated') . '</div>' :
 					'<div class="alert error">' . $this->l('Settings not updated') . '</div>';
 		}
 		return $html . $this->_displayForm();
@@ -90,7 +90,7 @@ class Nolifetv extends Module {
 		Configuration::updateValue('NOAIR_SCREENSHOT_HEIGHT', (int) Tools::getValue('screenshot_height')) AND
 		Configuration::updateValue('NOAIR_SCREENSHOT_WIDTH', (int) Tools::getValue('screenshot_width')) AND
 		Configuration::updateValue('NOAIR_UPCOMING_NB_SHOW', (int) Tools::getValue('upcoming_nb_show'))
-		);
+		) ? $this->_updateNoAirCache(true) : false;
 	}
 
 	protected function _displayForm() {
@@ -115,11 +115,15 @@ class Nolifetv extends Module {
 		  <input type="text" name="upcoming_nb_show" id="upcoming_nb_show" maxlength="3" size="3" value="' . Tools::getValue('upcoming_nb_show', Configuration::get('NOAIR_UPCOMING_NB_SHOW')) . '" />
             </div>
             <center><input type="submit" name="submitBlockRss" value="' . $this->l('Save') . '" class="button" /></center>
+	     <p style="font-size: xx-small;font-style: italic">
+		 ' . $this->l('Legal notice') . ' : <a href="http://www.quadra-informatique.fr" alt="Quadra Informatique">Quadra Informatique</a>
+	        ' . $this->l('is not affiliated with') . ' <a href="http://www.nolife-tv.com" alt="Nolife">Nolife</a>
+	     </p>
 	</fieldset>
 	</form>';
 	}
 
-	# Cache Stuff
+	// Cache Stuff
 
 	/**
 	 * Import Nolife NoAir Data to the local Cache
@@ -127,14 +131,10 @@ class Nolifetv extends Module {
 	 * @return bool
 	 */
 	protected function _loadNoAirCache() {
-		if (!file_exists($this->_cachePath . 'noair.cfg') OR
-				(int) Configuration::get('NOAIR_CACHE_UPDATE') < (time() - 3600)) {
-			return $this->_updateNoAirCache();
-		} else {
-			if ($ret = file_exists($this->_cachePath . 'noair.cfg'))
-				$this->_cacheData = unserialize(file_get_contents($this->_cachePath . 'noair.cfg'));
-			return $ret;
-		}
+
+		if ($ret = file_exists($this->_cachePath . 'noair.cfg'))
+			$this->_cacheData = unserialize(file_get_contents($this->_cachePath . 'noair.cfg'));
+		return $ret;
 	}
 
 	/**
@@ -158,10 +158,13 @@ class Nolifetv extends Module {
 	 *
 	 * @return bool
 	 */
-	protected function _updateNoAirCache() {
+	protected function _updateNoAirCache($force=false) {
 
-		# DELETES .jpg files
+		// Limit access to nolife webservice to once an hour
+		if (!$force && (int) Configuration::get('NOAIR_CACHE_UPDATE') > (time() - 3600))
+			return false;
 
+		// DELETES .jpg files
 		if ($handle = opendir($this->_cachePath)) {
 			while (false !== ($entry = readdir($handle))) {
 				if ($entry != "." && $entry != ".." && strstr($entry, '.jpg')) {
@@ -171,8 +174,7 @@ class Nolifetv extends Module {
 			closedir($handle);
 		}
 
-		# UPDATES the noAir data cache file
-
+		// UPDATES the noAir data cache file
 		$noAirXml = simplexml_load_file('http://www.nolife-tv.com/noair/noair.xml');
 		$i = 0;
 		foreach ($noAirXml->xpath('slot') as $xmlSlot) {
@@ -188,38 +190,55 @@ class Nolifetv extends Module {
 			$i++;
 		}
 
-		# SAVES the cache into local file
+		// SAVES the cache into local file
 		return $this->_saveNoAirCache();
 	}
 
+	// Upcoming Stuff
+
 	/**
-	 * Returns the xml data stored in the cacheNoAir file
-	 * Displays the current show and the $limit following shows
+	 * Return a formated array with :
+	 *  - the current program cacheId, and
+	 *  - The number of progams available after this program.
 	 *
-	 * $limit The x elements following the current show
-	 * @return sliced cacheNoAir (Serialized XML)
+	 * @return arrau
+	 */
+	public function _getUpcomingCounters() {
+
+		$ret = array('positionStart' => null, 'nbAvailable' => null);
+		$nowUTC = time() - ((int) date('Z')); // OUR TIMESTAMPS ARE BASED ON THE UTC DATE, SO WE NEED TO WORK WITH UTC NOW
+		// get first program position
+		foreach ($this->_cacheData as $program) {
+			if ($program['timestampUTC'] > $nowUTC) {
+				$ret['positionStart'] = $program['cacheId'] > 0 ? $program['cacheId'] - 1 : $program['cacheId'];
+				break;
+			}
+		}
+		// get nb programs available after
+		foreach ($this->_cacheData as $program)
+			if ($program['cacheId'] >= $ret['positionStart'])
+				$ret['nbAvailable']++;
+		return $ret;
+	}
+
+	/**
+	 * Load and check the Noair Cache.
+	 * returns a ready to use array for a smarty template file
+	 *
+	 * @return array
 	 */
 	public function getUpcoming() {
 
-		$this->_loadNoAirCache();
+		if (!$this->_loadNoAirCache())
+			$this->_updateNoAirCache();
 
-		$nowUTC = time() - ((int) date('Z')); # OUR TIMESTAMPS ARE BASED ON THE UTC DATE, SO WE NEED TO WORK WITH UTC NOW
-		$limit = (int) Configuration::get('NOAIR_UPCOMING_NB_SHOW');
+		$counters = $this->_getUpcomingCounters();
+		$nbToShow = 1 + (int) Configuration::get('NOAIR_UPCOMING_NB_SHOW');
 
-		$currentId = null;
-		$i = 0;
-		foreach ($this->_cacheData AS $program) {
-			#echo '<br/>test '.$elmt['timestampUTC'];
-			if ($program['timestampUTC'] > $nowUTC) {
-				$currentId = $i > 0 ? $i - 1 : $i;
-				break;
-			}
-			$i++;
-		}
+		if ($counters['nbAvailable'] < $nbToShow)
+			$this->_updateNoAirCache();
 
-		// todo : check si plus assez de progs en cache
-
-		return array_slice($this->_cacheData, $currentId, $limit + 1);
+		return array_slice($this->_cacheData, $counters['positionStart'], $nbToShow);
 	}
 
 }
