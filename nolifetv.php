@@ -32,7 +32,7 @@ class Nolifetv extends Module {
 		$this->displayName = $this->l('Nolife TV : NoAir Webservice');
 		$this->description = $this->l('Now on Nolife');
 
-		$this->_cachePath = dirname(__FILE__) . DS . 'cache' . DS;
+		$this->_cachePath = dirname(__FILE__) . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR;
 	}
 
 	public function install() {
