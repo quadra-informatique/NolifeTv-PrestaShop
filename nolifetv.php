@@ -114,6 +114,7 @@ class Nolifetv extends Module {
             <div style="padding: 0.2em 0.5em 1em 210px;">
 		  ' . date('l d F Y H:i:s', (int) Configuration::get('NOAIR_CACHE_UPDATE')) . '
             </div>
+            <div class="clear"></div>
             <label>' . $this->l('Screenshot Height') . '</label>
             <div class="margin-form">
 		  <input type="text" name="screenshot_height" id="screenshot_height" maxlength="3" size="3" value="' . Tools::getValue('screenshot_height', Configuration::get('NOAIR_SCREENSHOT_HEIGHT')) . '" />
