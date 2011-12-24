@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <module>
 	<name>nolifetv</name>
-	<displayName><![CDATA[Nolife TV]]></displayName>
-	<version><![CDATA[1]]></version>
-	<description><![CDATA[View last Nolife TV Shows]]></description>
-	<author><![CDATA[Quadra Informatique]]></author>
-	<tab><![CDATA[front_office_features]]></tab>
-	<is_configurable>0</is_configurable>
+	<displayName>Nolife TV : NoAir Webservice</displayName>
+	<version>1</version>
+	<description>Now on Nolife</description>
+	<author>Quadra Informatique</author>
+	<tab>front_office_features</tab>
+	<is_configurable>1</is_configurable>
 	<need_instance>1</need_instance>
 	<limited_countries></limited_countries>
 </module>

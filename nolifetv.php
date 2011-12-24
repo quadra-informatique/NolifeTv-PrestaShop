@@ -81,12 +81,20 @@ class Nolifetv extends Module {
 
 		$html = '<h2>' . $this->displayName . '</h2>';
 
+		$html .= $this->_checkPrerequisites();
+
 		if (!empty($_POST)) {
 			$html .= $this->_postProcess() ?
 					'<div class="conf confirm"><img src="../img/admin/ok.gif" alt="ok" /> ' . $this->l('Settings updated') . '</div>' :
 					'<div class="alert error">' . $this->l('Settings not updated') . '</div>';
 		}
 		return $html . $this->_displayForm();
+	}
+
+	protected function _checkPrerequisites() {
+		if (!is_writable($this->_cachePath))
+			return '<div class="alert error">' . $this->l('The module cache directory is not writable, please make it writable') . '</div>';
+		return null;
 	}
 
 	protected function _postProcess() {
