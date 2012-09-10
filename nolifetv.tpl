@@ -1,5 +1,14 @@
 <!-- Block nolifetv -->
 {*
+*  1997-2012 QUADRA INFORMATIQUE
+*
+*  @author QUADRA INFORMATIQUE <ecommerce@quadra-informatique.fr>
+*  @copyright 1997-2012 QUADRA INFORMATIQUE
+*  @version  Release: $Revision: 1.0 $
+*  @license  http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+*  
+*}
+{*
 	Available Options for $program
         (
             [cacheId] => 250 ### used to retrive the local image file
