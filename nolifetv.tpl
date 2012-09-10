@@ -53,8 +53,5 @@
 			<a href="{$base_dir}" alt="{$shop_name|escape:'htmlall':'UTF-8'}">{$shop_name|escape:'htmlall':'UTF-8'}</a> {l s='is not affiliated with' mod='nolifetv'} <a href="http://www.nolife-tv.com" alt="Nolife">Nolife</a>
 		</li>
 	</ul>
-
-
-
 </div>
 <!-- /Block nolifetv -->

@@ -12,7 +12,7 @@
  *
  *  @author Quadra Informatique <ecommerce@quadra-informatique.fr>
  *  @copyright 1997-2012 Quadra Informatique
- *  @version Release: $Revision: 1.0 $
+ *  @version Release: $Revision: 1.1 $
  *  @license http://www.opensource.org/licenses/OSL-3.0  Open Software License (OSL 3.0)
  */
 
@@ -26,9 +26,12 @@ class Nolifetv extends Module {
 	public function __construct() {
 		$this->name = 'nolifetv';
 		$this->tab = 'front_office_features';
-		$this->version = 1.0;
+		$this->version = 1.1;
 		$this->author = 'Quadra Informatique';
+		$this->module_key = "";
+		
 		parent::__construct();
+		
 		$this->displayName = $this->l('Nolife TV : NoAir Webservice');
 		$this->description = $this->l('Now on Nolife');
 
