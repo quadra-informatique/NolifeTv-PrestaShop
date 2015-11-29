@@ -26,7 +26,7 @@ class Nolifetv extends Module {
 	public function __construct() {
 		$this->name = 'nolifetv';
 		$this->tab = 'front_office_features';
-		$this->version = 1.1;
+		$this->version = '1.1.1';
 		$this->author = 'Quadra Informatique';
 		$this->module_key = "";
         $this->bootstrap=true;
