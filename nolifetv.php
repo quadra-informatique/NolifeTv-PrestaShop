@@ -29,7 +29,8 @@ class Nolifetv extends Module {
 		$this->version = 1.1;
 		$this->author = 'Quadra Informatique';
 		$this->module_key = "";
-		
+        $this->bootstrap=true;
+        
 		parent::__construct();
 		
 		$this->displayName = $this->l('Nolife TV : NoAir Webservice');
@@ -40,10 +41,10 @@ class Nolifetv extends Module {
 
 	public function install() {
 		return ( parent::install() AND
-		Configuration::updateValue('NOAIR_CACHE_UPDATE', 1) AND
-		Configuration::updateValue('NOAIR_SCREENSHOT_HEIGHT', 81) AND
-		Configuration::updateValue('NOAIR_SCREENSHOT_WIDTH', 144) AND
-		Configuration::updateValue('NOAIR_UPCOMING_NB_SHOW', 3) AND
+		Configuration::updateGlobalValue('NOAIR_CACHE_UPDATE', 1) AND
+		Configuration::updateGlobalValue('NOAIR_SCREENSHOT_HEIGHT', 90) AND
+		Configuration::updateGlobalValue('NOAIR_SCREENSHOT_WIDTH', 160) AND
+		Configuration::updateGlobalValue('NOAIR_UPCOMING_NB_SHOW', 3) AND
 		$this->registerHook('leftColumn'));
 	}
 
@@ -79,64 +80,80 @@ class Nolifetv extends Module {
 	}
 
 	// Admin stuff
+    
+    /**
+     * Load the configuration form
+     */
+    public function getContent() {
+        /**
+         * If values have been submitted in the form, process.
+         */
+        if (((bool)Tools::isSubmit('submitNolifeTv')) == true)
+            $this->postProcess();
 
-	public function getContent() {
+        return $this->checkPrerequisites().$this->renderForm();
+    }
 
-		$html = '<h2>' . $this->displayName . '</h2>';
+    /**
+     * Create the form that will be displayed in the configuration of your module.
+     */
+    protected function renderForm() {
 
-		$html .= $this->_checkPrerequisites();
+        $form = array(
+            'legend' => array(
+                'title' => $this->displayName,
+                'icon' => 'icon-cogs',
+            ),
+            'input' => array(
+                array(
+                    'type' => 'text',
+                    'label' => $this->l('Screenshot Height'),
+                    'name' => 'screenshot_height',
+                    'required' => true,
+                ),
+                array(
+                    'type' => 'text',
+                    'label' => $this->l('Screenshot Width'),
+                    'name' => 'screenshot_width',
+                    'required' => true,
+                ),
+                array(
+                    'type' => 'text',
+                    'label' => $this->l('Upcoming Nb Show'),
+                    'name' => 'upcoming_nb_show',
+                    'required' => true,
+                ),
+            ),
+            'submit' => array(
+                'title' => $this->l('Save'),
+            ),
+        );
 
-		if (!empty($_POST)) {
-			$html .= $this->_postProcess() ?
-					'<div class="conf confirm"><img src="../img/admin/ok.gif" alt="ok" /> ' . $this->l('Settings updated') . '</div>' :
-					'<div class="alert error">' . $this->l('Settings not updated') . '</div>';
-		}
-		return $html . $this->_displayForm();
-	}
+        $helper = new HelperForm();
+        $helper->module = $this;
+        $helper->identifier = $this->identifier;
+        $helper->submit_action = 'submitNolifeTv';
+        $helper->currentIndex = $this->context->link->getAdminLink('AdminModules', false)
+            .'&configure='.$this->name.'&tab_module='.$this->tab.'&module_name='.$this->name;
+        $helper->token = Tools::getAdminTokenLite('AdminModules');
+        $helper->fields_value['screenshot_height'] = (int)Configuration::getGlobalValue('NOAIR_SCREENSHOT_HEIGHT');
+        $helper->fields_value['screenshot_width'] = (int)Configuration::getGlobalValue('NOAIR_SCREENSHOT_WIDTH');
+        $helper->fields_value['upcoming_nb_show'] = (int)Configuration::getGlobalValue('NOAIR_UPCOMING_NB_SHOW');
+        return $helper->generateForm(array(array('form' => $form)));
+    }
 
-	protected function _checkPrerequisites() {
+	protected function checkPrerequisites() {
 		if (!is_writable($this->_cachePath))
 			return '<div class="alert error">' . $this->l('The module cache directory is not writable, please make it writable') . '</div>';
 		return null;
 	}
 
-	protected function _postProcess() {
+	protected function postProcess() {
 		return (
-		Configuration::updateValue('NOAIR_SCREENSHOT_HEIGHT', (int) Tools::getValue('screenshot_height')) AND
-		Configuration::updateValue('NOAIR_SCREENSHOT_WIDTH', (int) Tools::getValue('screenshot_width')) AND
-		Configuration::updateValue('NOAIR_UPCOMING_NB_SHOW', (int) Tools::getValue('upcoming_nb_show'))
+		Configuration::updateGlobalValue('NOAIR_SCREENSHOT_HEIGHT', (int) Tools::getValue('screenshot_height')) AND
+		Configuration::updateGlobalValue('NOAIR_SCREENSHOT_WIDTH', (int) Tools::getValue('screenshot_width')) AND
+		Configuration::updateGlobalValue('NOAIR_UPCOMING_NB_SHOW', (int) Tools::getValue('upcoming_nb_show'))
 		) ? $this->_updateNoAirCache(true) : false;
-	}
-
-	protected function _displayForm() {
-		global $cookie;
-		return '
-        <form action="' . $_SERVER['REQUEST_URI'] . '" method="post">
-        <fieldset style="padding:5px 0 15px 5px" ><legend style="margin-left:8px;"><img src="' . $this->_path . 'logo.gif" alt="" title="" />' . $this->l('Settings') . '</legend>
-            <label>' . $this->l('Last Noair Cache Update') . '</label>
-            <div style="padding: 0.2em 0.5em 1em 210px;">
-		  ' . date('l d F Y H:i:s', (int) Configuration::get('NOAIR_CACHE_UPDATE')) . '
-            </div>
-            <div class="clear"></div>
-            <label>' . $this->l('Screenshot Height') . '</label>
-            <div class="margin-form">
-		  <input type="text" name="screenshot_height" id="screenshot_height" maxlength="3" size="3" value="' . Tools::getValue('screenshot_height', Configuration::get('NOAIR_SCREENSHOT_HEIGHT')) . '" />
-            </div>
-            <label>' . $this->l('Screenshot Width') . '</label>
-            <div class="margin-form">
-		  <input type="text" name="screenshot_width" id="screenshot_width" maxlength="3" size="3" value="' . Tools::getValue('screenshot_width', Configuration::get('NOAIR_SCREENSHOT_WIDTH')) . '" />
-            </div>
-            <label>' . $this->l('Upcoming Nb Show') . '</label>
-            <div class="margin-form">
-		  <input type="text" name="upcoming_nb_show" id="upcoming_nb_show" maxlength="3" size="3" value="' . Tools::getValue('upcoming_nb_show', Configuration::get('NOAIR_UPCOMING_NB_SHOW')) . '" />
-            </div>
-            <center><input type="submit" name="submitBlockRss" value="' . $this->l('Save') . '" class="button" /></center>
-	     <p style="font-size: xx-small;font-style: italic">
-		 ' . $this->l('Legal notice') . ' : <a href="http://www.quadra-informatique.fr" alt="Quadra Informatique">Quadra Informatique</a>
-	        ' . $this->l('is not affiliated with') . ' <a href="http://www.nolife-tv.com" alt="Nolife">Nolife</a>
-	     </p>
-	</fieldset>
-	</form>';
 	}
 
 	// Cache Stuff
@@ -167,7 +184,7 @@ class Nolifetv extends Module {
 				fwrite($file, serialize($this->_cacheData)) === false OR
 				!fclose($file))
 			return false;
-		Configuration::updateValue('NOAIR_CACHE_UPDATE', time());
+		Configuration::updateGlobalValue('NOAIR_CACHE_UPDATE', time());
 		return true;
 	}
 
@@ -179,7 +196,7 @@ class Nolifetv extends Module {
 	protected function _updateNoAirCache($force=false) {
 
 		// Limit access to nolife webservice to once an hour
-		if (!$force && (int) Configuration::get('NOAIR_CACHE_UPDATE') > (time() - 3600))
+		if (!$force && (int) Configuration::getGlobalValue('NOAIR_CACHE_UPDATE') > (time() - 3600))
 			return false;
 
 		// DELETES .jpg files
@@ -256,7 +273,8 @@ class Nolifetv extends Module {
 	 */
 	public function getUpcoming() {
 
-		$nbToShow = 1 + (int) Configuration::get('NOAIR_UPCOMING_NB_SHOW');
+        if(! $nbToShow = (int) Configuration::getGlobalValue('NOAIR_UPCOMING_NB_SHOW'))
+            return false;
 
 		if (!$this->_loadNoAirCache() OR ($this->_cacheAvailableUpcoming < $nbToShow))
 			$this->_updateNoAirCache();

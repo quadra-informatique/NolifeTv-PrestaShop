@@ -2,7 +2,7 @@
 {*
 *  1997-2012 QUADRA INFORMATIQUE
 *
-*  @author QUADRA INFORMATIQUE <ecommerce@quadra-informatique.fr>
+*  @author QUADRA INFORMATIQUE <modules@quadra-informatique.fr>
 *  @copyright 1997-2012 QUADRA INFORMATIQUE
 *  @version  Release: $Revision: 1.0 $
 *  @license  http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
@@ -44,9 +44,11 @@
 				<a href="{$program.NolifeOnlineURL}" alt="{$program.date|date_format:"%H:%M"} {$program.title}" title="{l s='View on Nolife Online' mod='nolifetv'}">
 					<p class="bold">{$program.date|date_format:"%H:%M"} {$program.title}</p>
 				</a>
-				<a href="{$program.NolifeOnlineURL}" alt="{$program.title}" title="{l s='View on Nolife Online' mod='nolifetv'}">
-					<img class="img_nolife"src="{$base_dir}modules/nolifetv/screenshot.php?id={$program.cacheId}" alt ="{$program.title}" />
-				</a><br/>
+                {if $program.screenshot OR $program.AdditionalScreenshot}
+                    <a href="{$program.NolifeOnlineURL}" alt="{$program.title}" title="{l s='View on Nolife Online' mod='nolifetv'}">
+                        <img class="img_nolife"src="{$base_dir}modules/nolifetv/screenshot.php?id={$program.cacheId}" alt ="{$program.title}" />
+                    </a><br/>
+                {/if}
 				<a href="{$program.NolifeOnlineURL}" alt="{$program.description}" title="{l s='View on Nolife Online' mod='nolifetv'}">
 						{$program.description}
 				</a>
